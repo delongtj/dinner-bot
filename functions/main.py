@@ -58,3 +58,21 @@ def select_plan(request_obj):
         return jsonify({"plan": plan})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@functions_framework.http
+def setup_config(request_obj):
+    """Set up family configuration (calendars, preferences, etc.)."""
+    from handlers.config import setup_family_config
+    
+    data = request_obj.get_json()
+    family_id = data.get("family_id")
+    
+    if not family_id:
+        return jsonify({"error": "family_id required"}), 400
+    
+    try:
+        config = setup_family_config(family_id, data)
+        return jsonify({"config": config})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

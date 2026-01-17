@@ -1,3 +1,11 @@
+-- Drop existing tables if they exist
+DROP TABLE IF EXISTS meal_plans;
+DROP TABLE IF EXISTS recipe_usage;
+DROP TABLE IF EXISTS recipes;
+DROP TABLE IF EXISTS family_config;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS families;
+
 -- Families (top-level entity)
 CREATE TABLE families (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -22,7 +30,8 @@ CREATE TABLE family_config (
   family_id UUID NOT NULL UNIQUE REFERENCES families(id) ON DELETE CASCADE,
   
   -- Google Calendar
-  google_calendar_id TEXT,
+  personal_calendar_ids TEXT[] DEFAULT '{}',
+  shared_calendar_id TEXT,
   calendar_sync_token TEXT,
   
   -- Preferences
