@@ -7,9 +7,9 @@ dinner-bot is an AI-powered meal planning agent that streamlines weekly meal pla
 - Reading user calendar data to identify scheduling constraints
 - Generating multiple complete weekly meal plans (Mon-Sun)
 - Considering seasonal/weather factors and dietary preferences
-- Delivering selected recipes via email
+- Delivering selected recipes to a shared Google Calendar (daily 5:00-6:00 PM dinner events with recipe details)
 
-The system minimizes user friction through ultra-easy recipe intake and a simple weekly selection workflow.
+The system minimizes user friction through ultra-easy recipe intake, simple weekly selection, and leverages Google Calendar for delivery instead of custom email infrastructure.
 
 ---
 
@@ -25,7 +25,7 @@ The system minimizes user friction through ultra-easy recipe intake and a simple
 - Calendar integration reading events
 - Agent generates 3-4 complete weekly plans
 - User selects preferred plan
-- Selected plan emailed on specified mornings
+- Selected plan automatically synced to shared Google Calendar (daily dinner events with recipe details)
 - System runs weekly on schedule (Cloud Scheduler or similar)
 
 ---
@@ -134,16 +134,17 @@ The system minimizes user friction through ultra-easy recipe intake and a simple
    - Settings dashboard
 
 4. **Integrations**
-   - Google Calendar API (read events, extract constraints)
-   - Claude API (plan generation, recipe metadata extraction)
-   - SendGrid or SMTP (email delivery)
-   - Cloud Scheduler or APScheduler (weekly triggers)
+    - Google Calendar API (read events for constraints, write dinner events with recipes)
+    - Claude API (plan generation, recipe metadata extraction)
+    - Cloud Scheduler or APScheduler (weekly triggers)
 
 ### Deployment
-- Backend: Cloud Run (serverless) or simple VPS
-- Database: Cloud SQL or managed Postgres
-- Frontend: Static hosting (Vercel, Netlify, or same origin as backend)
-- Cost estimate: ~$10-20/month (Cloud Run + small DB)
+- Backend: Google Cloud Functions (Python, serverless)
+- Database: Supabase (PostgreSQL)
+- Frontend: Cloud Storage + Cloud CDN (static Svelte build)
+- Scheduler: Google Cloud Scheduler (free tier)
+- Google Calendar: Shared calendar (free)
+- Cost estimate: ~$0 (free tiers only, except optional Supabase overage)
 
 ---
 
@@ -205,8 +206,9 @@ The system minimizes user friction through ultra-easy recipe intake and a simple
 - Plan locked in
 
 ### 3. Daily Delivery
-- Each morning: Selected recipe emailed with ingredients, instructions, prep notes
-- Optional: Print-friendly format
+- Selected plan synced to shared Google Calendar
+- Each day: 5:00-6:00 PM dinner event created with recipe details (title, link, ingredients, prep notes) in event description
+- Google Calendar sends 6 AM email reminder to all subscribers (built-in Google Calendar reminder)
 
 ---
 
@@ -216,29 +218,29 @@ The system minimizes user friction through ultra-easy recipe intake and a simple
 - Grocery integration / sale tracking
 - Advanced feedback loop ("I'm tired of chili")
 - Recipe rating system
-- Multi-user support initially
+- Multi-user support initially (single service account per household)
 - Frontend "nice-to-haves"
+- OAuth support (use service account for MVP)
 
 **Include in MVP:**
 - Recipe CRUD + basic metadata
-- Calendar integration (read-only)
+- Calendar integration (read events for constraints, write dinner events)
 - Agent-driven plan generation (3-4 options)
 - Plan selection mechanism
-- Email delivery
+- Google Calendar event creation with recipe details + reminder setup
 - Weekly scheduler
 
 ---
 
-## Tech Stack (Recommended)
+## Tech Stack (Finalized)
 
-**Backend:** Python (FastAPI or Flask)
-**Database:** PostgreSQL
-**LLM:** Claude API
-**Calendar:** Google Calendar API
-**Email:** SendGrid or AWS SES
-**Scheduling:** APScheduler or Cloud Scheduler
-**Frontend:** Svelte or simple HTML/JS (if needed for MVP)
-**Deployment:** Docker + Cloud Run or Railway
+**Backend:** Python (Cloud Functions)
+**Database:** Supabase (PostgreSQL)
+**LLM:** Gemini API (free tier, abstraction layer for provider swapping)
+**Calendar:** Google Calendar API (read events + write dinner events)
+**Scheduling:** Google Cloud Scheduler
+**Frontend:** Svelte (static build on Cloud Storage + CDN)
+**Deployment:** GCP-centric (Cloud Functions, Cloud Storage, Cloud Scheduler)
 
 ---
 
