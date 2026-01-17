@@ -32,79 +32,96 @@ The system minimizes user friction through ultra-easy recipe intake, simple week
 
 ## Data Schema
 
+### Family
+Top-level entity enabling spouse/family collaboration
+```
+{
+  id: uuid
+  name: string
+  created_at: timestamp
+  updated_at: timestamp
+}
+```
+
+### User
+Minimal auth + family membership
+```
+{
+  id: uuid
+  family_id: uuid (FK to Family)
+  email: string (unique)
+  name: string
+  created_at: timestamp
+  updated_at: timestamp
+}
+```
+
+### FamilyConfig
+Shared configuration per family
+```
+{
+  id: uuid
+  family_id: uuid (unique FK to Family)
+  google_calendar_id: string
+  calendar_sync_token: string
+  cuisine_preferences: string[]
+  dietary_restrictions: string[]
+  target_prep_time: number (minutes)
+  serving_size: number
+  plan_generation_day: string (e.g., "Saturday")
+  plan_generation_time: string (e.g., "18:00")
+  created_at: timestamp
+  updated_at: timestamp
+}
+```
+
 ### Recipe
 ```
 {
-  id: string (uuid)
-  url: string (original source)
+  id: uuid
+  family_id: uuid (FK to Family)
+  url: string
   title: string
-  prepTime: number (minutes)
-  cookTime: number (minutes)
+  prep_time: number (minutes)
+  cook_time: number (minutes)
   servings: number
-  ingredients: string[] (raw text for now)
+  ingredients: string
   instructions: string
-  
-  // Semantic tags (for agent filtering/ranking)
-  cuisineType: string[] (e.g., ["Italian", "Asian"])
-  mealType: string (lunch | dinner | breakfast)
-  complexity: "quick" | "moderate" | "involved"
-  dietaryFlags: string[] (vegetarian, keto, dairy-free, etc.)
-  seasonalRelevance: "spring" | "summer" | "fall" | "winter" | "any"
-  
-  // Tracking
-  createdAt: timestamp
-  usedDates: timestamp[] (when it was planned)
-  rating: 1-5 (optional user feedback after cooking)
-  lastPlanned: timestamp
+  cuisine_type: string[]
+  meal_type: string (breakfast | lunch | dinner)
+  complexity: string (quick | moderate | involved)
+  dietary_flags: string[]
+  seasonal_relevance: string (spring | summer | fall | winter | any)
+  rating: number (1-5, optional)
   active: boolean
+  created_at: timestamp
+  updated_at: timestamp
+}
+```
+
+### RecipeUsage
+History of when recipes were planned
+```
+{
+  id: uuid
+  recipe_id: uuid (FK to Recipe)
+  planned_at: timestamp
+  created_at: timestamp
 }
 ```
 
 ### MealPlan
 ```
 {
-  id: string (uuid)
-  weekStartDate: date
-  generated: timestamp
-  plan: {
-    [dayOfWeek]: {
-      recipeName: string
-      recipeId: string
-      notes: string (optional)
-    }
-  }
+  id: uuid
+  family_id: uuid (FK to Family)
+  week_start_date: date
+  plan: JSONB { "Monday": { "recipe_id": "...", "recipe_name": "...", "notes": "..." }, ... }
   selected: boolean
-  selectedAt: timestamp
+  selected_at: timestamp
   variant: number (1-4, for plan A/B/C/D)
-}
-```
-
-### User/Config
-```
-{
-  userId: string
-  email: string
-  
-  // Calendar integration
-  googleCalendarId: string
-  calendarSyncToken: string (incremental sync)
-  
-  // Preferences
-  cuisinePreferences: string[]
-  dietaryRestrictions: string[]
-  targetPrepTime: number (max minutes willing to prep)
-  servingSize: number (number of people)
-  
-  // Scheduling
-  planGenerationDay: string (e.g., "Saturday")
-  planGenerationTime: string (e.g., "18:00")
-  recipeEmailTime: string (e.g., "08:00")
-  
-  // Recipe intake settings
-  recipeSourcePreferences: {
-    allowedDomains: string[]
-    parsingHints: object
-  }
+  created_at: timestamp
+  updated_at: timestamp
 }
 ```
 
@@ -121,11 +138,10 @@ The system minimizes user friction through ultra-easy recipe intake, simple week
    - Email delivery
    - Scheduled job runner
 
-2. **Database (PostgreSQL)**
-   - Recipes
-   - Meal plans
-   - User settings
-   - Planning history
+2. **Database (PostgreSQL via NeonDB or similar)**
+    - Families, Users, FamilyConfig
+    - Recipes, RecipeUsage
+    - Meal plans
 
 3. **Frontend (Optional MVP, maybe Svelte/Vue)**
    - Recipe intake UI (paste URL, parse, confirm metadata)
@@ -140,11 +156,11 @@ The system minimizes user friction through ultra-easy recipe intake, simple week
 
 ### Deployment
 - Backend: Google Cloud Functions (Python, serverless)
-- Database: Supabase (PostgreSQL)
+- Database: NeonDB (PostgreSQL, free tier)
 - Frontend: Cloud Storage + Cloud CDN (static Svelte build)
 - Scheduler: Google Cloud Scheduler (free tier)
 - Google Calendar: Shared calendar (free)
-- Cost estimate: ~$0 (free tiers only, except optional Supabase overage)
+- Cost estimate: ~$0 (free tiers only)
 
 ---
 
@@ -235,7 +251,7 @@ The system minimizes user friction through ultra-easy recipe intake, simple week
 ## Tech Stack (Finalized)
 
 **Backend:** Python (Cloud Functions)
-**Database:** Supabase (PostgreSQL)
+**Database:** NeonDB (PostgreSQL, free tier)
 **LLM:** Gemini API (free tier, abstraction layer for provider swapping)
 **Calendar:** Google Calendar API (read events + write dinner events)
 **Scheduling:** Google Cloud Scheduler
