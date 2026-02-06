@@ -1,6 +1,11 @@
+import os
+from dotenv import load_dotenv
+
+# Load .env for local development (no-op in Cloud Functions)
+load_dotenv()
+
 import functions_framework
-import json
-from flask import jsonify, request
+from flask import jsonify
 
 
 @functions_framework.http
@@ -13,14 +18,41 @@ def health(request_obj):
 def list_recipes(request_obj):
     """List recipes for a family."""
     from handlers.recipes import list_recipes as _list_recipes
-    
+
     family_id = request_obj.args.get("family_id")
     if not family_id:
         return jsonify({"error": "family_id required"}), 400
-    
+
     try:
         recipes = _list_recipes(family_id)
         return jsonify(recipes)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@functions_framework.http
+def add_recipe(request_obj):
+    """Add a recipe by URL (extracts metadata via LLM) or manual entry."""
+    from handlers.recipes import extract_and_create_recipe, create_recipe
+
+    data = request_obj.get_json()
+    family_id = data.get("family_id")
+
+    if not family_id:
+        return jsonify({"error": "family_id required"}), 400
+
+    try:
+        url = data.get("url")
+        if url:
+            # Extract metadata from URL and create recipe
+            result = extract_and_create_recipe(family_id, url)
+        else:
+            # Manual entry - requires at least a title
+            if not data.get("title"):
+                return jsonify({"error": "url or title required"}), 400
+            result = create_recipe(family_id, data)
+
+        return jsonify({"recipe": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
