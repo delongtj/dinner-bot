@@ -320,6 +320,34 @@ When the user starts a planning session, the backend:
 
 ---
 
+## Implementation Status
+
+**Done:**
+- Schema designed (`schema.sql` — up to date with this spec)
+- Backend scaffolding (Cloud Functions, Flask handlers, DB connection utilities)
+- LLM abstraction layer (Gemini implemented, provider-swappable)
+- Recipe CRUD + LLM-powered metadata extraction from URLs
+- Google Calendar integration (read busy days, write dinner events, clear old events)
+- Family config setup endpoint
+- Old-style meal plan generation + selection (needs rework, see below)
+
+**Next up — backend rework for interactive planning:**
+1. Update recipe extraction to output structured JSONB ingredients (`[{name, quantity, unit, category}]`) instead of plain text
+2. Build planning session endpoints: create session (pre-loads context), chat (streams LLM response), finalize (locks plan + creates calendar events + generates grocery list), abandon
+3. Add weather API integration (Open-Meteo or similar) for session context
+4. Build grocery list aggregation logic (deduplicate, normalize units, group by category)
+5. Remove or replace old `generate_plans` / `select_plan` endpoints
+
+**Then — frontend:**
+6. Svelte project setup + routing
+7. Chat interface (planning session)
+8. Recipe intake UI (paste URL, review/edit metadata)
+9. Recipe library browser
+10. Grocery list view (grouped by category, copy-friendly)
+11. Settings page
+
+---
+
 ## Notes
 
 - Start with manual recipe data entry for first 10-20 recipes to validate the concept
