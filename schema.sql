@@ -36,6 +36,9 @@ CREATE TABLE family_config (
   shared_calendar_id TEXT,
   calendar_sync_token TEXT,
 
+  -- Location (for weather context)
+  zip_code TEXT,
+
   -- Preferences
   cuisine_preferences TEXT[] DEFAULT '{}',
   dietary_restrictions TEXT[] DEFAULT '{}',

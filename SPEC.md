@@ -323,28 +323,26 @@ When the user starts a planning session, the backend:
 ## Implementation Status
 
 **Done:**
-- Schema designed (`schema.sql` — up to date with this spec)
+- Schema designed (`schema.sql` — up to date with this spec, includes `zip_code` on `family_config`)
 - Backend scaffolding (Cloud Functions, Flask handlers, DB connection utilities)
 - LLM abstraction layer (Gemini implemented, provider-swappable)
 - Recipe CRUD + LLM-powered metadata extraction from URLs
 - Google Calendar integration (read busy days, write dinner events, clear old events)
-- Family config setup endpoint
-- Old-style meal plan generation + selection (needs rework, see below)
+- Family config setup endpoint (includes `zip_code` for weather)
+- Structured JSONB ingredients in recipe extraction (`[{name, quantity, unit, category}]`)
+- Weather API integration (Open-Meteo geocoding + 7-day forecast via `functions/weather/`)
+- Grocery list aggregation (unit normalization, quantity parsing, deduplication, category grouping via `functions/grocery/`)
+- Interactive planning session endpoints: `create_planning_session`, `planning_chat`, `finalize_plan`, `abandon_plan`
+- Planning finalization flow: extracts structured plan from conversation, saves meal plan, syncs calendar, generates grocery list, records recipe usage
+- Old batch-style `generate_plans` / `select_plan` endpoints removed
 
-**Next up — backend rework for interactive planning:**
-1. Update recipe extraction to output structured JSONB ingredients (`[{name, quantity, unit, category}]`) instead of plain text
-2. Build planning session endpoints: create session (pre-loads context), chat (streams LLM response), finalize (locks plan + creates calendar events + generates grocery list), abandon
-3. Add weather API integration (Open-Meteo or similar) for session context
-4. Build grocery list aggregation logic (deduplicate, normalize units, group by category)
-5. Remove or replace old `generate_plans` / `select_plan` endpoints
-
-**Then — frontend:**
-6. Svelte project setup + routing
-7. Chat interface (planning session)
-8. Recipe intake UI (paste URL, review/edit metadata)
-9. Recipe library browser
-10. Grocery list view (grouped by category, copy-friendly)
-11. Settings page
+**Next up — frontend:**
+1. Svelte project setup + routing
+2. Chat interface (planning session)
+3. Recipe intake UI (paste URL, review/edit metadata)
+4. Recipe library browser
+5. Grocery list view (grouped by category, copy-friendly)
+6. Settings page
 
 ---
 

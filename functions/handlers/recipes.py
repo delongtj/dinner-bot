@@ -1,4 +1,5 @@
 import json
+from psycopg2.extras import Json
 from db.connection import query, execute
 from llm import get_llm_provider
 
@@ -41,7 +42,7 @@ def create_recipe(family_id: str, data: dict):
         data.get("prep_time", 0),
         data.get("cook_time", 0),
         data.get("servings", 2),
-        data.get("ingredients", ""),
+        Json(data.get("ingredients", [])),
         data.get("instructions", ""),
         data.get("cuisine_type", []),
         data.get("meal_type", "dinner"),

@@ -20,12 +20,14 @@ def setup_family_config(family_id: str, config_data: dict):
     sql = """
         INSERT INTO family_config (
             family_id, personal_calendar_ids, shared_calendar_id,
-            cuisine_preferences, dietary_restrictions, target_prep_time,
-            serving_size, plan_generation_day, plan_generation_time
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            zip_code, cuisine_preferences, dietary_restrictions,
+            target_prep_time, serving_size,
+            plan_generation_day, plan_generation_time
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (family_id) DO UPDATE SET
             personal_calendar_ids = EXCLUDED.personal_calendar_ids,
             shared_calendar_id = EXCLUDED.shared_calendar_id,
+            zip_code = EXCLUDED.zip_code,
             cuisine_preferences = EXCLUDED.cuisine_preferences,
             dietary_restrictions = EXCLUDED.dietary_restrictions,
             target_prep_time = EXCLUDED.target_prep_time,
@@ -35,11 +37,12 @@ def setup_family_config(family_id: str, config_data: dict):
             updated_at = CURRENT_TIMESTAMP
         RETURNING *
     """
-    
+
     params = (
         family_id,
         config_data.get("personal_calendar_ids", []),
         config_data.get("shared_calendar_id"),
+        config_data.get("zip_code"),
         config_data.get("cuisine_preferences", []),
         config_data.get("dietary_restrictions", []),
         config_data.get("target_prep_time"),

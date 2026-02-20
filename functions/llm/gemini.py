@@ -30,35 +30,43 @@ class GeminiProvider(LLMProvider):
             - prep_time: number (minutes, 0 if unknown)
             - cook_time: number (minutes, 0 if unknown)
             - servings: number
-            - ingredients: string (comma-separated list)
+            - ingredients: array of objects, each with:
+              - name: string (ingredient name, e.g. "chicken breast")
+              - quantity: string (amount, e.g. "2", "1/2", "1.5")
+              - unit: string (e.g. "lb", "cup", "tbsp", "oz", "" for count items)
+              - category: string (one of: "produce", "meat", "dairy", "pantry", "frozen", "bakery", "spices", "other")
             - instructions: string
             - cuisine_type: array of strings
             - meal_type: "breakfast" | "lunch" | "dinner"
             - complexity: "quick" | "moderate" | "involved"
             - dietary_flags: array of strings (vegetarian, vegan, dairy-free, keto, etc.)
             - seasonal_relevance: "spring" | "summer" | "fall" | "winter" | "any"
-            
+
             Return ONLY valid JSON, no other text.
             """
         else:
             prompt = f"""
             Extract recipe metadata from this text:
-            
+
             {text}
-            
+
             Return a JSON object with these fields:
             - title: string
             - prep_time: number (minutes, 0 if unknown)
             - cook_time: number (minutes, 0 if unknown)
             - servings: number
-            - ingredients: string (comma-separated list)
+            - ingredients: array of objects, each with:
+              - name: string (ingredient name, e.g. "chicken breast")
+              - quantity: string (amount, e.g. "2", "1/2", "1.5")
+              - unit: string (e.g. "lb", "cup", "tbsp", "oz", "" for count items)
+              - category: string (one of: "produce", "meat", "dairy", "pantry", "frozen", "bakery", "spices", "other")
             - instructions: string
             - cuisine_type: array of strings
             - meal_type: "breakfast" | "lunch" | "dinner"
             - complexity: "quick" | "moderate" | "involved"
             - dietary_flags: array of strings (vegetarian, vegan, dairy-free, keto, etc.)
             - seasonal_relevance: "spring" | "summer" | "fall" | "winter" | "any"
-            
+
             Return ONLY valid JSON, no other text.
             """
         
@@ -66,75 +74,74 @@ class GeminiProvider(LLMProvider):
         result = json.loads(response.text)
         return result
     
-    def generate_meal_plans(
+    def chat_plan(
         self,
+        system_prompt: str,
+        messages: List[Dict[str, str]],
+    ) -> str:
+        """Conversational meal-planning turn using Gemini chat."""
+        # Build Gemini chat history: prepend system prompt to the first user message
+        history = []
+        first_user = True
+        for msg in messages[:-1]:  # all but the latest message
+            role = "user" if msg["role"] == "user" else "model"
+            content = msg["content"]
+            if first_user and role == "user":
+                content = f"{system_prompt}\n\n{content}"
+                first_user = False
+            history.append({"role": role, "parts": [content]})
+
+        chat = self.model.start_chat(history=history)
+
+        # Send the latest message
+        last = messages[-1]
+        content = last["content"]
+        if first_user:
+            content = f"{system_prompt}\n\n{content}"
+
+        response = chat.send_message(content)
+        return response.text
+
+    def extract_plan_from_conversation(
+        self,
+        system_prompt: str,
+        messages: List[Dict[str, str]],
         recipes: List[Dict[str, Any]],
-        preferences: Dict[str, Any],
-        calendar_constraints: Dict[str, Any],
-        num_plans: int = 4
-    ) -> List[Dict[str, Any]]:
-        """Generate meal plans using Gemini."""
-        recipes_json = json.dumps(recipes, indent=2)
-        preferences_json = json.dumps(preferences, indent=2)
-        constraints_json = json.dumps(calendar_constraints, indent=2)
-        
+    ) -> Dict[str, Any]:
+        """Extract a structured meal plan from the planning conversation."""
+        conversation_text = "\n".join(
+            f"{m['role'].upper()}: {m['content']}" for m in messages
+        )
+        recipes_json = json.dumps(
+            [{"id": str(r["id"]), "title": r["title"]} for r in recipes],
+            indent=2,
+        )
+
         prompt = f"""
-        Generate {num_plans} diverse meal plans for the week (Monday-Sunday).
-        
-        Available recipes:
+        {system_prompt}
+
+        Below is a meal-planning conversation and the family's recipe library.
+        Extract the FINAL agreed-upon meal plan from the conversation.
+
+        CONVERSATION:
+        {conversation_text}
+
+        AVAILABLE RECIPES (use these IDs):
         {recipes_json}
-        
-        User preferences:
-        {preferences_json}
-        
-        Calendar constraints (busy days needing quick meals):
-        {constraints_json}
-        
-        For each plan, return a JSON object mapping day names to recipe selections:
+
+        Return a JSON object mapping each day to the chosen recipe:
         {{
-          "Monday": {{"recipe_id": "uuid", "recipe_name": "name", "notes": "optional"}},
-          "Tuesday": {{"recipe_id": "uuid", "recipe_name": "name", "notes": "optional"}},
-          ...
+          "Monday": {{"recipe_id": "<uuid>", "recipe_name": "<title>", "notes": ""}},
+          "Tuesday": {{"recipe_id": "<uuid>", "recipe_name": "<title>", "notes": ""}},
+          "Wednesday": {{"recipe_id": "<uuid>", "recipe_name": "<title>", "notes": ""}},
+          "Thursday": {{"recipe_id": "<uuid>", "recipe_name": "<title>", "notes": ""}},
+          "Friday": {{"recipe_id": "<uuid>", "recipe_name": "<title>", "notes": ""}},
+          "Saturday": {{"recipe_id": "<uuid>", "recipe_name": "<title>", "notes": ""}},
+          "Sunday": {{"recipe_id": "<uuid>", "recipe_name": "<title>", "notes": ""}}
         }}
-        
-        Return {num_plans} complete meal plans (one per line, valid JSON only).
+
+        Return ONLY valid JSON, no other text.
         """
-        
+
         response = self.model.generate_content(prompt)
-        lines = response.text.strip().split('\n')
-        plans = []
-        for line in lines:
-            if line.strip():
-                try:
-                    plan = json.loads(line)
-                    plans.append(plan)
-                except json.JSONDecodeError:
-                    continue
-        
-        return plans[:num_plans]
-    
-    def rank_recipes(
-        self,
-        recipes: List[Dict[str, Any]],
-        preferences: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Rank recipes by fit to preferences using Gemini."""
-        recipes_json = json.dumps(recipes, indent=2)
-        preferences_json = json.dumps(preferences, indent=2)
-        
-        prompt = f"""
-        Rank these recipes by how well they fit the user preferences.
-        
-        Recipes:
-        {recipes_json}
-        
-        Preferences:
-        {preferences_json}
-        
-        Return the recipes sorted by relevance (best first), as a valid JSON array.
-        Include all original fields plus a "score" field (0-100).
-        """
-        
-        response = self.model.generate_content(prompt)
-        ranked = json.loads(response.text)
-        return ranked
+        return json.loads(response.text)

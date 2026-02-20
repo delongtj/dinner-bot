@@ -1,7 +1,5 @@
-import json
 from datetime import datetime, timedelta
-from db.connection import query, execute
-from llm import get_llm_provider
+from db.connection import query
 from calendar.google_calendar import GoogleCalendarProvider
 
 
@@ -23,48 +21,6 @@ def get_active_recipes(family_id: str):
     """
     return query(sql, (family_id,))
 
-
-def generate_meal_plans(family_id: str, num_plans: int = 4):
-    """Generate multiple meal plan options."""
-    config = get_family_config(family_id)
-    recipes = get_active_recipes(family_id)
-    
-    if not recipes:
-        raise ValueError("No active recipes available for meal planning")
-    
-    # Prepare preferences dict
-    preferences = {
-        "cuisine_preferences": config.get("cuisine_preferences", []),
-        "dietary_restrictions": config.get("dietary_restrictions", []),
-        "target_prep_time": config.get("target_prep_time"),
-        "serving_size": config.get("serving_size", 2),
-    }
-    
-    # Get calendar constraints (busy days)
-    calendar_constraints = _get_calendar_constraints(config)
-    
-    # Call LLM to generate plans
-    llm = get_llm_provider()
-    plans = llm.generate_meal_plans(
-        recipes,
-        preferences,
-        calendar_constraints,
-        num_plans
-    )
-    
-    # Store generated plans
-    results = []
-    for i, plan in enumerate(plans, 1):
-        sql = """
-            INSERT INTO meal_plans (
-                family_id, week_start_date, plan, variant
-            ) VALUES (%s, CURRENT_DATE, %s, %s)
-            RETURNING id, created_at
-        """
-        result = query(sql, (family_id, json.dumps(plan), i), fetch_one=True)
-        results.append({**plan, "id": str(result["id"]), "variant": i})
-    
-    return results
 
 
 def _get_calendar_constraints(config: dict) -> dict:
@@ -159,30 +115,4 @@ def sync_meal_plan_to_calendar(family_id: str, plan_id: str) -> dict:
         "week_start": str(week_start_date),
         "events_created": len(created_events),
         "events": created_events
-    }
-
-
-def select_meal_plan(family_id: str, plan_id: str):
-    """Mark a meal plan as selected and sync to calendar."""
-    # Deselect any previously selected plans
-    execute(
-        "UPDATE meal_plans SET selected = FALSE WHERE family_id = %s AND selected = TRUE",
-        (family_id,)
-    )
-    
-    # Select the chosen plan
-    sql = """
-        UPDATE meal_plans
-        SET selected = TRUE, selected_at = CURRENT_TIMESTAMP
-        WHERE id = %s AND family_id = %s
-        RETURNING id, plan
-    """
-    result = query(sql, (plan_id, family_id), fetch_one=True)
-    
-    # Sync to calendar
-    sync_result = sync_meal_plan_to_calendar(family_id, plan_id)
-    
-    return {
-        "plan": result,
-        "calendar_sync": sync_result
     }

@@ -58,36 +58,75 @@ def add_recipe(request_obj):
 
 
 @functions_framework.http
-def generate_plans(request_obj):
-    """Generate meal plan options."""
-    from handlers.meal_plans import generate_meal_plans
-    
-    family_id = request_obj.args.get("family_id")
+def create_planning_session(request_obj):
+    """Start a new interactive planning session."""
+    from handlers.planning import create_session
+
+    data = request_obj.get_json()
+    family_id = data.get("family_id")
+
     if not family_id:
         return jsonify({"error": "family_id required"}), 400
-    
+
     try:
-        plans = generate_meal_plans(family_id)
-        return jsonify({"plans": plans})
+        result = create_session(family_id)
+        return jsonify(result), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @functions_framework.http
-def select_plan(request_obj):
-    """Select a meal plan."""
-    from handlers.meal_plans import select_meal_plan
-    
+def planning_chat(request_obj):
+    """Send a message in an active planning session."""
+    from handlers.planning import chat
+
     data = request_obj.get_json()
-    family_id = data.get("family_id")
-    plan_id = data.get("plan_id")
-    
-    if not family_id or not plan_id:
-        return jsonify({"error": "family_id and plan_id required"}), 400
-    
+    session_id = data.get("session_id")
+    message = data.get("message")
+
+    if not session_id or not message:
+        return jsonify({"error": "session_id and message required"}), 400
+
     try:
-        plan = select_meal_plan(family_id, plan_id)
-        return jsonify({"plan": plan})
+        result = chat(session_id, message)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@functions_framework.http
+def finalize_plan(request_obj):
+    """Finalize a planning session into a meal plan."""
+    from handlers.planning import finalize_session
+
+    data = request_obj.get_json()
+    session_id = data.get("session_id")
+    family_id = data.get("family_id")
+
+    if not session_id or not family_id:
+        return jsonify({"error": "session_id and family_id required"}), 400
+
+    try:
+        result = finalize_session(session_id, family_id)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@functions_framework.http
+def abandon_plan(request_obj):
+    """Abandon an active planning session."""
+    from handlers.planning import abandon_session
+
+    data = request_obj.get_json()
+    session_id = data.get("session_id")
+
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
+
+    try:
+        result = abandon_session(session_id)
+        return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

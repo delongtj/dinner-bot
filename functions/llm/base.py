@@ -10,36 +10,39 @@ class LLMProvider(ABC):
         """
         Extract recipe metadata from URL or raw text.
         
-        Returns dict with: title, prep_time, cook_time, servings, 
-        ingredients, instructions, cuisine_type, meal_type, complexity, 
-        dietary_flags, seasonal_relevance
+        Returns dict with: title, prep_time, cook_time, servings,
+        ingredients (list of {name, quantity, unit, category}), instructions,
+        cuisine_type, meal_type, complexity, dietary_flags, seasonal_relevance
         """
         pass
     
     @abstractmethod
-    def generate_meal_plans(
+    def chat_plan(
         self,
-        recipes: List[Dict[str, Any]],
-        preferences: Dict[str, Any],
-        calendar_constraints: Dict[str, Any],
-        num_plans: int = 4
-    ) -> List[Dict[str, Any]]:
+        system_prompt: str,
+        messages: List[Dict[str, str]],
+    ) -> str:
         """
-        Generate multiple meal plans.
-        
-        Returns list of meal plans, each with a dict mapping:
-        { "Monday": { "recipe_id": "...", "recipe_name": "...", "notes": "..." }, ... }
+        Conversational meal-planning turn.
+
+        Args:
+            system_prompt: Full system prompt with family context.
+            messages: Conversation history [{role, content}, ...].
+
+        Returns the assistant's reply as a string.
         """
         pass
-    
+
     @abstractmethod
-    def rank_recipes(
+    def extract_plan_from_conversation(
         self,
+        system_prompt: str,
+        messages: List[Dict[str, str]],
         recipes: List[Dict[str, Any]],
-        preferences: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
-        Rank recipes by fit to preferences.
-        Returns recipes sorted by relevance.
+        Extract a structured meal plan from a planning conversation.
+
+        Returns dict mapping day names to {recipe_id, recipe_name, notes}.
         """
         pass
