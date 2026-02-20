@@ -8,6 +8,35 @@ import functions_framework
 from flask import jsonify
 
 
+def _get_family_id_from_token(request_obj):
+    """Verify the Firebase token and resolve the user's family_id.
+
+    Returns (family_id, email, error_response).
+    On success error_response is None.  On failure family_id/email are None.
+    """
+    from handlers.auth import verify_token
+    from db.connection import query
+
+    try:
+        decoded = verify_token(request_obj)
+    except ValueError as e:
+        return None, None, (jsonify({"error": str(e)}), 401)
+
+    email = decoded["email"]
+
+    rows = query(
+        "SELECT f.id FROM families f JOIN users u ON u.family_id = f.id WHERE u.email = %s",
+        (email,),
+    )
+    if not rows:
+        return None, email, (
+            jsonify({"error": "No family found for this account. Please complete setup."}),
+            404,
+        )
+
+    return str(rows[0]["id"]), email, None
+
+
 @functions_framework.http
 def health(request_obj):
     """Health check endpoint."""
@@ -19,9 +48,9 @@ def list_recipes(request_obj):
     """List recipes for a family."""
     from handlers.recipes import list_recipes as _list_recipes
 
-    family_id = request_obj.args.get("family_id")
-    if not family_id:
-        return jsonify({"error": "family_id required"}), 400
+    family_id, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
 
     try:
         recipes = _list_recipes(family_id)
@@ -35,19 +64,17 @@ def add_recipe(request_obj):
     """Add a recipe by URL (extracts metadata via LLM) or manual entry."""
     from handlers.recipes import extract_and_create_recipe, create_recipe
 
-    data = request_obj.get_json()
-    family_id = data.get("family_id")
+    family_id, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
 
-    if not family_id:
-        return jsonify({"error": "family_id required"}), 400
+    data = request_obj.get_json()
 
     try:
         url = data.get("url")
         if url:
-            # Extract metadata from URL and create recipe
             result = extract_and_create_recipe(family_id, url)
         else:
-            # Manual entry - requires at least a title
             if not data.get("title"):
                 return jsonify({"error": "url or title required"}), 400
             result = create_recipe(family_id, data)
@@ -62,11 +89,9 @@ def create_planning_session(request_obj):
     """Start a new interactive planning session."""
     from handlers.planning import create_session
 
-    data = request_obj.get_json()
-    family_id = data.get("family_id")
-
-    if not family_id:
-        return jsonify({"error": "family_id required"}), 400
+    family_id, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
 
     try:
         result = create_session(family_id)
@@ -79,6 +104,10 @@ def create_planning_session(request_obj):
 def planning_chat(request_obj):
     """Send a message in an active planning session."""
     from handlers.planning import chat
+
+    _, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
 
     data = request_obj.get_json()
     session_id = data.get("session_id")
@@ -99,12 +128,15 @@ def finalize_plan(request_obj):
     """Finalize a planning session into a meal plan."""
     from handlers.planning import finalize_session
 
+    family_id, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
+
     data = request_obj.get_json()
     session_id = data.get("session_id")
-    family_id = data.get("family_id")
 
-    if not session_id or not family_id:
-        return jsonify({"error": "session_id and family_id required"}), 400
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
 
     try:
         result = finalize_session(session_id, family_id)
@@ -117,6 +149,10 @@ def finalize_plan(request_obj):
 def abandon_plan(request_obj):
     """Abandon an active planning session."""
     from handlers.planning import abandon_session
+
+    _, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
 
     data = request_obj.get_json()
     session_id = data.get("session_id")
@@ -135,13 +171,13 @@ def abandon_plan(request_obj):
 def setup_config(request_obj):
     """Set up family configuration (calendars, preferences, etc.)."""
     from handlers.config import setup_family_config
-    
+
+    family_id, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
+
     data = request_obj.get_json()
-    family_id = data.get("family_id")
-    
-    if not family_id:
-        return jsonify({"error": "family_id required"}), 400
-    
+
     try:
         config = setup_family_config(family_id, data)
         return jsonify({"config": config})

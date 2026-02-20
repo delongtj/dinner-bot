@@ -1,0 +1,14 @@
+{
+  "name": "dinner-bot",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n api,ui -c blue,green \"npm run dev:api\" \"npm run dev:ui\"",
+    "dev:ui": "cd frontend && npm run dev",
+    "dev:api": "cd functions && python -m functions_framework --target health --debug --port 8080",
+    "build": "cd frontend && npm run build",
+    "install:all": "cd frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

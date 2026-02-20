@@ -29,5 +29,10 @@ Thumbs.db
 *.pem
 *.key
 
+# Node / Frontend
+node_modules/
+frontend/build/
+frontend/.svelte-kit/
+
 # Local testing
 .tool-versions
