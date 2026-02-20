@@ -62,21 +62,23 @@ export function createPlanningSession(): Promise<PlanningSession> {
 export function sendPlanningMessage(
 	sessionId: string,
 	message: string
-): Promise<{ message: ChatMessage; session: PlanningSession }> {
+): Promise<{ session_id: string; message: ChatMessage }> {
 	return request('/planning_chat', {
 		method: 'POST',
 		body: JSON.stringify({ session_id: sessionId, message })
 	});
 }
 
-export function finalizePlan(sessionId: string): Promise<{ meal_plan: MealPlan; grocery_list: GroceryList }> {
+export function finalizePlan(
+	sessionId: string
+): Promise<{ plan_id: string; plan: Record<string, unknown>; grocery_list: unknown; calendar_sync: unknown }> {
 	return request('/finalize_plan', {
 		method: 'POST',
 		body: JSON.stringify({ session_id: sessionId })
 	});
 }
 
-export function abandonPlan(sessionId: string): Promise<{ status: string }> {
+export function abandonPlan(sessionId: string): Promise<{ session_id: string; status: string }> {
 	return request('/abandon_plan', {
 		method: 'POST',
 		body: JSON.stringify({ session_id: sessionId })
@@ -84,9 +86,18 @@ export function abandonPlan(sessionId: string): Promise<{ status: string }> {
 }
 
 // Config
+export function getConfig(): Promise<{ config: FamilyConfig | null }> {
+	return request('/get_config');
+}
+
 export function setupConfig(config: Partial<FamilyConfig>): Promise<{ config: FamilyConfig }> {
 	return request('/setup_config', {
 		method: 'POST',
 		body: JSON.stringify(config)
 	});
+}
+
+// Grocery
+export function getGroceryList(): Promise<{ grocery_list: GroceryList | null }> {
+	return request('/get_grocery');
 }

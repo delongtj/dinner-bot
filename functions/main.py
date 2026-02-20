@@ -168,6 +168,22 @@ def abandon_plan(request_obj):
 
 
 @functions_framework.http
+def get_config(request_obj):
+    """Get family configuration."""
+    from handlers.config import get_family_config
+
+    family_id, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
+
+    try:
+        config = get_family_config(family_id)
+        return jsonify({"config": config})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@functions_framework.http
 def setup_config(request_obj):
     """Set up family configuration (calendars, preferences, etc.)."""
     from handlers.config import setup_family_config
@@ -181,5 +197,31 @@ def setup_config(request_obj):
     try:
         config = setup_family_config(family_id, data)
         return jsonify({"config": config})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@functions_framework.http
+def get_grocery(request_obj):
+    """Get the most recent grocery list for the family."""
+    from db.connection import query as db_query
+
+    family_id, _, err = _get_family_id_from_token(request_obj)
+    if err:
+        return err
+
+    try:
+        result = db_query(
+            """
+            SELECT gl.* FROM grocery_lists gl
+            JOIN meal_plans mp ON mp.id = gl.meal_plan_id
+            WHERE mp.family_id = %s
+            ORDER BY gl.created_at DESC
+            LIMIT 1
+            """,
+            (family_id,),
+            fetch_one=True,
+        )
+        return jsonify({"grocery_list": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
