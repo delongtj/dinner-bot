@@ -1,12 +1,21 @@
 <script lang="ts">
-	import { getConfig, setupConfig } from '$lib/api/client';
-	import type { FamilyConfig } from '$lib/api/types';
+	import { getConfig, setupConfig, getMe, createInvite } from '$lib/api/client';
+	import type { FamilyConfig, UserInfo } from '$lib/api/types';
 
 	let loading = $state(true);
 	let saving = $state(false);
 	let error = $state('');
 	let success = $state('');
 
+	// Family info
+	let familyName = $state('');
+	let members = $state<{ email: string; name: string | null }[]>([]);
+	let inviteCode = $state('');
+	let inviteExpires = $state('');
+	let inviteLoading = $state(false);
+	let inviteError = $state('');
+
+	// Config fields
 	let zipCode = $state('');
 	let servingSize = $state(2);
 	let targetPrepTime = $state('');
@@ -17,7 +26,12 @@
 
 	async function load() {
 		try {
-			const { config } = await getConfig();
+			const [meResult, configResult] = await Promise.all([getMe(), getConfig()]);
+
+			familyName = meResult.family?.name ?? '';
+			members = meResult.members ?? [];
+
+			const config = configResult.config;
 			if (config) {
 				zipCode = config.zip_code ?? '';
 				servingSize = config.serving_size ?? 2;
@@ -64,6 +78,25 @@
 			saving = false;
 		}
 	}
+
+	async function handleGenerateInvite() {
+		inviteLoading = true;
+		inviteError = '';
+		inviteCode = '';
+		try {
+			const result = await createInvite();
+			inviteCode = result.code;
+			inviteExpires = new Date(result.expires_at).toLocaleDateString();
+		} catch (e) {
+			inviteError = e instanceof Error ? e.message : 'Failed to generate invite';
+		} finally {
+			inviteLoading = false;
+		}
+	}
+
+	async function copyInviteCode() {
+		await navigator.clipboard.writeText(inviteCode);
+	}
 </script>
 
 <svelte:head>
@@ -77,105 +110,150 @@
 		<div class="h-8 w-8 animate-spin rounded-full border-4 border-stone-300 border-t-amber-500"></div>
 	</div>
 {:else}
-	<form onsubmit={(e) => { e.preventDefault(); handleSave(); }} class="space-y-6">
+	<div class="space-y-6">
 		<div class="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
-			<h2 class="mb-4 text-lg font-semibold text-stone-800">Household</h2>
-			<div class="grid gap-4 sm:grid-cols-2">
-				<label class="block">
-					<span class="text-sm font-medium text-stone-700">Zip Code</span>
-					<input
-						type="text"
-						bind:value={zipCode}
-						placeholder="30301"
-						class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-					/>
-				</label>
-				<label class="block">
-					<span class="text-sm font-medium text-stone-700">Serving Size</span>
-					<input
-						type="number"
-						bind:value={servingSize}
-						min="1"
-						max="20"
-						class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-					/>
-				</label>
-				<label class="block">
-					<span class="text-sm font-medium text-stone-700">Target Prep Time (minutes)</span>
-					<input
-						type="number"
-						bind:value={targetPrepTime}
-						placeholder="30"
-						class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-					/>
-				</label>
+			<h2 class="mb-4 text-lg font-semibold text-stone-800">Family</h2>
+			<p class="mb-3 text-sm text-stone-600">{familyName}</p>
+
+			<div class="mb-4">
+				<h3 class="mb-2 text-sm font-medium text-stone-700">Members</h3>
+				<ul class="space-y-1">
+					{#each members as member}
+						<li class="text-sm text-stone-600">
+							{member.name ?? 'No name'} — {member.email}
+						</li>
+					{/each}
+				</ul>
+			</div>
+
+			<div>
+				<button
+					onclick={handleGenerateInvite}
+					disabled={inviteLoading}
+					class="rounded-md bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-200 disabled:opacity-50"
+				>
+					{inviteLoading ? 'Generating...' : 'Generate Invite Code'}
+				</button>
+
+				{#if inviteCode}
+					<div class="mt-3 flex items-center gap-2">
+						<code class="rounded bg-stone-100 px-3 py-1.5 text-lg font-mono tracking-widest text-stone-800">{inviteCode}</code>
+						<button
+							onclick={copyInviteCode}
+							class="rounded-md bg-amber-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-600"
+						>
+							Copy
+						</button>
+					</div>
+					<p class="mt-1 text-xs text-stone-400">Expires {inviteExpires}</p>
+				{/if}
+
+				{#if inviteError}
+					<p class="mt-2 text-sm text-red-600">{inviteError}</p>
+				{/if}
 			</div>
 		</div>
 
-		<div class="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
-			<h2 class="mb-4 text-lg font-semibold text-stone-800">Preferences</h2>
-			<div class="grid gap-4">
-				<label class="block">
-					<span class="text-sm font-medium text-stone-700">Cuisine Preferences</span>
-					<input
-						type="text"
-						bind:value={cuisinePreferences}
-						placeholder="Italian, Mexican, Thai"
-						class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-					/>
-					<span class="mt-1 text-xs text-stone-400">Comma-separated</span>
-				</label>
-				<label class="block">
-					<span class="text-sm font-medium text-stone-700">Dietary Restrictions</span>
-					<input
-						type="text"
-						bind:value={dietaryRestrictions}
-						placeholder="Gluten-free, Nut allergy"
-						class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-					/>
-					<span class="mt-1 text-xs text-stone-400">Comma-separated</span>
-				</label>
+		<form onsubmit={(e) => { e.preventDefault(); handleSave(); }} class="space-y-6">
+			<div class="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+				<h2 class="mb-4 text-lg font-semibold text-stone-800">Household</h2>
+				<div class="grid gap-4 sm:grid-cols-2">
+					<label class="block">
+						<span class="text-sm font-medium text-stone-700">Zip Code</span>
+						<input
+							type="text"
+							bind:value={zipCode}
+							placeholder="30301"
+							class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-sm font-medium text-stone-700">Serving Size</span>
+						<input
+							type="number"
+							bind:value={servingSize}
+							min="1"
+							max="20"
+							class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-sm font-medium text-stone-700">Target Prep Time (minutes)</span>
+						<input
+							type="number"
+							bind:value={targetPrepTime}
+							placeholder="30"
+							class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+						/>
+					</label>
+				</div>
 			</div>
-		</div>
 
-		<div class="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
-			<h2 class="mb-4 text-lg font-semibold text-stone-800">Google Calendar</h2>
-			<div class="grid gap-4">
-				<label class="block">
-					<span class="text-sm font-medium text-stone-700">Shared Calendar ID</span>
-					<input
-						type="text"
-						bind:value={sharedCalendarId}
-						placeholder="family@group.calendar.google.com"
-						class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-					/>
-				</label>
-				<label class="block">
-					<span class="text-sm font-medium text-stone-700">Personal Calendar IDs</span>
-					<input
-						type="text"
-						bind:value={personalCalendarIds}
-						placeholder="you@gmail.com, spouse@gmail.com"
-						class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-					/>
-					<span class="mt-1 text-xs text-stone-400">Comma-separated — used to check for busy days</span>
-				</label>
+			<div class="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+				<h2 class="mb-4 text-lg font-semibold text-stone-800">Preferences</h2>
+				<div class="grid gap-4">
+					<label class="block">
+						<span class="text-sm font-medium text-stone-700">Cuisine Preferences</span>
+						<input
+							type="text"
+							bind:value={cuisinePreferences}
+							placeholder="Italian, Mexican, Thai"
+							class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+						/>
+						<span class="mt-1 text-xs text-stone-400">Comma-separated</span>
+					</label>
+					<label class="block">
+						<span class="text-sm font-medium text-stone-700">Dietary Restrictions</span>
+						<input
+							type="text"
+							bind:value={dietaryRestrictions}
+							placeholder="Gluten-free, Nut allergy"
+							class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+						/>
+						<span class="mt-1 text-xs text-stone-400">Comma-separated</span>
+					</label>
+				</div>
 			</div>
-		</div>
 
-		{#if error}
-			<p class="text-sm text-red-600">{error}</p>
-		{/if}
-		{#if success}
-			<p class="text-sm text-green-600">{success}</p>
-		{/if}
+			<div class="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+				<h2 class="mb-4 text-lg font-semibold text-stone-800">Google Calendar</h2>
+				<div class="grid gap-4">
+					<label class="block">
+						<span class="text-sm font-medium text-stone-700">Shared Calendar ID</span>
+						<input
+							type="text"
+							bind:value={sharedCalendarId}
+							placeholder="family@group.calendar.google.com"
+							class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-sm font-medium text-stone-700">Personal Calendar IDs</span>
+						<input
+							type="text"
+							bind:value={personalCalendarIds}
+							placeholder="you@gmail.com, spouse@gmail.com"
+							class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+						/>
+						<span class="mt-1 text-xs text-stone-400">Comma-separated — used to check for busy days</span>
+					</label>
+				</div>
+			</div>
 
-		<button
-			type="submit"
-			disabled={saving}
-			class="rounded-md bg-amber-500 px-6 py-2.5 font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
-		>
-			{saving ? 'Saving...' : 'Save Settings'}
-		</button>
-	</form>
+			{#if error}
+				<p class="text-sm text-red-600">{error}</p>
+			{/if}
+			{#if success}
+				<p class="text-sm text-green-600">{success}</p>
+			{/if}
+
+			<button
+				type="submit"
+				disabled={saving}
+				class="rounded-md bg-amber-500 px-6 py-2.5 font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+			>
+				{saving ? 'Saving...' : 'Save Settings'}
+			</button>
+		</form>
+	</div>
 {/if}

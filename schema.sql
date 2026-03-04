@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS meal_plans;
 DROP TABLE IF EXISTS recipe_usage;
 DROP TABLE IF EXISTS recipes;
 DROP TABLE IF EXISTS family_config;
+DROP TABLE IF EXISTS family_invites;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS families;
 
@@ -130,8 +131,20 @@ CREATE TABLE grocery_lists (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Family invites
+CREATE TABLE family_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  family_id UUID NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+  code TEXT NOT NULL UNIQUE,
+  created_by UUID NOT NULL REFERENCES users(id),
+  used_by UUID REFERENCES users(id),
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX idx_users_family_id ON users(family_id);
+CREATE INDEX idx_family_invites_code ON family_invites(code);
 CREATE INDEX idx_recipes_family_id ON recipes(family_id);
 CREATE INDEX idx_recipes_active ON recipes(family_id, active) WHERE active = TRUE;
 CREATE INDEX idx_recipe_usage_recipe_id ON recipe_usage(recipe_id);

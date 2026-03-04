@@ -6,7 +6,8 @@ import type {
 	ChatMessage,
 	MealPlan,
 	GroceryList,
-	FamilyConfig
+	FamilyConfig,
+	UserInfo
 } from './types';
 
 async function getHeaders(): Promise<HeadersInit> {
@@ -15,6 +16,14 @@ async function getHeaders(): Promise<HeadersInit> {
 		'Content-Type': 'application/json',
 		...(token ? { Authorization: `Bearer ${token}` } : {})
 	};
+}
+
+class ApiError extends Error {
+	status: number;
+	constructor(message: string, status: number) {
+		super(message);
+		this.status = status;
+	}
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -26,10 +35,31 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 	if (!res.ok) {
 		const body = await res.json().catch(() => ({}));
-		throw new Error(body.error || `Request failed: ${res.status}`);
+		throw new ApiError(body.error || `Request failed: ${res.status}`, res.status);
 	}
 
 	return res.json();
+}
+
+export { ApiError };
+
+// User & Registration
+export function getMe(): Promise<UserInfo> {
+	return request('/me');
+}
+
+export function register(name?: string, inviteCode?: string): Promise<UserInfo> {
+	return request('/register', {
+		method: 'POST',
+		body: JSON.stringify({ name, invite_code: inviteCode })
+	});
+}
+
+export function createInvite(): Promise<{ code: string; expires_at: string }> {
+	return request('/create_invite', {
+		method: 'POST',
+		body: JSON.stringify({})
+	});
 }
 
 // Recipes

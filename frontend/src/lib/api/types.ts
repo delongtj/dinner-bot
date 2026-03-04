@@ -70,6 +70,24 @@ export interface MealPlan {
 	updated_at: string;
 }
 
+export interface User {
+	id: string;
+	family_id: string;
+	email: string;
+	name: string | null;
+}
+
+export interface Family {
+	id: string;
+	name: string;
+}
+
+export interface UserInfo {
+	user: User;
+	family: Family;
+	members: User[];
+}
+
 export interface FamilyConfig {
 	id: string;
 	family_id: string;
